@@ -1,0 +1,61 @@
+import requests
+import pandas as pd
+from datetime import datetime
+
+# Set access token and base URL #put your hastags
+token = "Your_CODE"
+base_url = "https://graph.facebook.com/v17.0"
+instagram_id = "Your_ID"
+hashtags = ["ayuda", "Ayuda_Dana", "SolidaridadValencia", "DANA2024", "dana", "dana2024","ayudadana", "danavalencia", "AyudaValencia", "ayudavalencia", "Dana2024", "donación", "valencia", "València", "inundaciones", "voluntariado"]
+
+# Date range for filtering
+start_date = datetime(2024, 10, 28)
+end_date = datetime(2024, 12, 31)
+results = []
+
+# Function to get hashtag ID
+def get_hashtag_id(hashtag):
+    url = f"{base_url}/ig_hashtag_search?user_id={instagram_id}&q={hashtag}&access_token={token}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        if 'data' in data and data['data']:
+            return data['data'][0]['id']
+    print(f"Failed to retrieve hashtag ID for: {hashtag}")
+    return None
+
+# Function to fetch posts for a hashtag
+def get_hashtag_posts(hashtag_id, hashtag):
+    # Modified fields to include like_count
+    url = f"{base_url}/{hashtag_id}/top_media?user_id={instagram_id}&fields=id,caption,timestamp,like_count&access_token={token}"  
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        for post in data.get('data', []):
+            timestamp_str = post.get('timestamp')
+            if timestamp_str:
+                post_date = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00')).replace(tzinfo=None)
+                # Filter by the target date range
+                if start_date <= post_date <= end_date:
+                    results.append({
+                        'Hashtag': hashtag,
+                        'Post ID': post.get('id'),
+                        'Caption': post.get('caption', 'No caption'),
+                        'Timestamp': post.get('timestamp'),
+                        'Likes': post.get('like_count', 0)  # Add Likes column
+                    })
+    else:
+        print(f"Error while retrieving posts: {response.status_code}, {response.text}")
+
+# Iterate over hashtags to collect data
+for hashtag in hashtags:
+    hashtag_id = get_hashtag_id(hashtag)
+    if hashtag_id:
+        get_hashtag_posts(hashtag_id, hashtag)
+
+# Convert the results to DataFrame and save to Excel
+df = pd.DataFrame(results)
+output_file = "Instagram_Data_04.xlsx"
+df.to_excel(output_file, index=False)
+
+print(f"Data collection complete! File saved: {output_file}")
